@@ -1201,11 +1201,16 @@ class JPATexture(object):
 
     @classmethod
     def from_file(cls, f):
-        shape = cls()
-        f.read(16)#this needs to be addressed later because i doubt its always 16
+		#This is a dumb way to skip through a variable amount of padding but it works
+        pad = 0
+        while read_uint8(f) != 0x54:#0x54 is T
+            pad += 1
 
+        f.seek(f.tell()-1)
+        print("Parsing the TEX1 data. " + format(pad) + " bytes of padding")
+
+        shape = cls()
         name = read_name(f)
-        print("Parsing the TEX1 data")
         while name == "TEX1":
             size = read_uint32(f)
             read_uint32(f)
