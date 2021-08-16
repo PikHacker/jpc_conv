@@ -1202,7 +1202,7 @@ class JPATexture(object):
     @classmethod
     def from_file(cls, f):
         shape = cls()
-        f.read(16)#padding?
+        f.read(16)#this needs to be addressed later because i doubt its always 16
 
         name = read_name(f)
         print("Parsing the TEX1 data")
@@ -1225,7 +1225,7 @@ class JPATexture(object):
         return shape 
 
     def write(self, f):
-        while f.tell() % 16 != 0:
+        while f.tell() % 32 != 0:
             write_uint8(f,0)
 
         start = f.tell()
