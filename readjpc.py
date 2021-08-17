@@ -218,7 +218,7 @@ class DynamicsBlock(object):
         write_uint32(f, 0x7c)
         write_uint32(f, int(self.flags, base=16))
 
-        write_float(f, self.unk1)
+        write_uint32(f, self.unk1)
         write_float(f, self.unk2)
         write_float(f, self.unk3)
         write_float(f, self.unk4)
@@ -413,12 +413,20 @@ class BaseShape(object):
         read_uint16(f)
         read_uint8(f)
 
+        #sometimes a BSP1 section decides it wants to have a whole float matrix thing instead of color sub data
+        if int(shape.flags, base=16) & 0x1000000:
+            shape.floatMatrix = []
+            for x in range(10):
+                shape.floatMatrix.append(read_float(f))
+
         if shape.colorDiv != 0:#this is for some extra junk only used by mergeIdx functions
-            shape.MergeIdx1 = read_uint32(f)
-            shape.MergeIdx2 = read_uint32(f)
+            shape.MergeIdx = read_uint32(f)
+            test = read_uint32(f)
+            if shape.colorDiv > 4:#extended list
+                shape.MergeIdx2 = test
 
         if colorTable1Offs != 0:
-            f.seek(start + colorTable1Offs)#the BSP1 likes to have a lot of junk data in it for no reason, so these seeks skip it
+            f.seek(start + colorTable1Offs)
             for x in range(shape.ColorTable1Count):
                 shape.colorData1.append(BaseShape_ColorData.from_file(f,1,x))
 
@@ -464,18 +472,30 @@ class BaseShape(object):
         write_uint16(f,0)
         write_uint8(f,0)
 
-        if self.colorDiv != 0:
-            write_uint32(f,self.MergeIdx1)
+        offs2 = 0x34
+
+        if int(self.flags, base=16) & 0x1000000:#float matrix
+            for thing in self.floatMatrix:
+                write_float(f, thing)
+            offs2 += 0x28
+
+
+        if self.colorDiv != 0:#mergeIdx
+            write_uint32(f,self.MergeIdx)
+            offs2 += 4
+
+        if self.colorDiv > 4:#even more mergeIDx stuff
             write_uint32(f,self.MergeIdx2)
-            old = f.tell()
-            f.seek(start+12)
-            write_uint16(f,0x3c)
-            offs = 0x3c + 6*self.ColorTable1Count
-            if offs % 4 != 0:
-                offs +=2
-            write_uint16(f,offs)
-            f.seek(old)
-    
+            offs2 += 4
+
+        old = f.tell()
+        f.seek(start+12)
+        write_uint16(f,offs2)
+        offs = offs2 + 6*self.ColorTable1Count
+        if offs % 4 != 0:
+            offs +=2
+        write_uint16(f,offs)
+        f.seek(old)   
 
         for child in self.colorData1:
                 child.write(f)
@@ -547,13 +567,18 @@ class BaseShape(object):
         item.assign(obj[0], "Color1")
         item.assign(obj[0], "Color2")
 
-        if "MergeIdx1" in obj[0]:
-            item.assign(obj[0], "MergeIdx1")
+        if "MergeIdx" in obj[0]:
+            item.assign(obj[0], "MergeIdx")
+        if "MergeIdx2" in obj[0]:
             item.assign(obj[0], "MergeIdx2")
 
         item.assign(obj[0], "init_p")
         item.assign(obj[0], "repeatFlag")
         item.assign(obj[0], "mergeFlag")
+
+        if "floatMatrix" in obj[0]:
+            item.assign(obj[0], "floatMatrix")
+
         for x in range(item.ColorTable1Count):
             item.colorData1.append(BaseShape_ColorData.deserialize(obj[1+x]))
         for x in range(item.ColorTable2Count):
@@ -1133,8 +1158,8 @@ class KeyBlock(object):
 
         shape.flag = read_uint8(f)
         shape.KeyFrameCount = read_uint8(f)
-        read_uint8(f)
-        read_uint8(f)
+        shape.unk1 = read_uint8(f)
+        shape.unk2 = read_uint8(f)
 
         for x in range(shape.KeyFrameCount):
             shape.calcList.append(KeyBlock_field.from_file(f))
@@ -1148,8 +1173,8 @@ class KeyBlock(object):
         write_uint32(f, 0)#temp
         write_uint8(f, self.flag)
         write_uint8(f, self.KeyFrameCount)
-        write_uint8(f, 0)
-        write_uint8(f, 0)
+        write_uint8(f, self.unk1)
+        write_uint8(f, self.unk2)
 
         for field in self.calcList:
             field.write(f)
@@ -1187,6 +1212,8 @@ class KeyBlock(object):
         item.name = "KFA1"
         item.assign(obj[0], "flag")
         item.assign(obj[0], "KeyFrameCount")
+        item.assign(obj[0], "unk1")
+        item.assign(obj[0], "unk2")
 
         for x in range(item.KeyFrameCount):
             item.calcList.append(KeyBlock_field.deserialize(obj[x+1]))
@@ -1214,8 +1241,7 @@ class JPATexture(object):
         while name == "TEX1":
             size = read_uint32(f)
             read_uint32(f)
-            text = f.read(0x10).decode("shift_jis_2004")
-            f.read(4)#padding?
+            text = f.read(0x14).decode("shift_jis_2004")
             text = re.sub(r'\u0000',"",text)
             shape.text.append(text)
             print(text)
