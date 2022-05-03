@@ -6,6 +6,46 @@ import os
 #the name of the folder used for textures
 tex_folder = "temp"
 
+#this is used to pair up common floats
+class Vector3():
+    def __init__(self):
+        self.x = 0.0
+        self.y = 0.0
+        self.z = 0.0
+
+    @classmethod
+    def from_file(cls, f):
+        node = cls()
+        node.x = read_float(f)
+        node.y = read_float(f)
+        node.z = read_float(f)
+        return node
+    
+    def write(self, f):
+        write_float(f, self.x)
+        write_float(f, self.y)
+        write_float(f, self.z)
+
+    def serialize(self):
+        result = {}
+        for key, val in self.__dict__.items():
+            if isinstance(val, bytes):
+                raise RuntimeError("hhhe")
+            result[key] = val
+                
+        return result
+
+    def assign(self, src, field):
+        self.__dict__[field] = src[field]
+
+    @classmethod
+    def deserialize(cls, obj):
+        item = cls()
+        item.assign(obj, "x")
+        item.assign(obj, "y")
+        item.assign(obj, "z")
+        return item 
+
 #The .jpc file is really a big list of these JPAResource objects
 class JPAResource(object): 
     def __init__(self):
@@ -151,6 +191,9 @@ class JPAResource(object):
 class DynamicsBlock(object):
     def __init__(self):
         self.name = "BEM1"
+        self.emitterScale: Vector3
+        self.emitterTranslation: Vector3
+        self.emitterDirection: Vector3
         
     @classmethod
     def from_file(cls, f):
@@ -164,50 +207,43 @@ class DynamicsBlock(object):
         pane = cls()
         size = read_uint32(f)
         assert size == 0x7c
-        pane.flags = hex(read_uint32(f))
+        pane.emitFlags = hex(read_uint32(f))
 
-        pane.unk1 = read_uint32(f)
-        pane.unk2 = read_float(f)
-        pane.unk3 = read_float(f)
-        pane.unk4 = read_float(f)
-        
-        pane.pos_x = read_float(f)
-        pane.pos_y = read_float(f)
-        pane.pos_z = read_float(f)
+        read_uint32(f)# always 0
+        pane.emitterScale = Vector3.from_file(f)
 
-        pane.axis_x = read_float(f)
-        pane.axis_y = read_float(f)
-        pane.axis_z = read_float(f)
+        pane.emitterTranslation = Vector3.from_file(f)
 
-        pane.rand_angle_x = read_float(f)
-        pane.rand_angle_y = read_float(f)
-        pane.rand_angle_z = read_float(f)
+        pane.emitterDirection = Vector3.from_file(f)
 
-        pane.velocity_x = read_float(f)
-        pane.velocity_y = read_float(f)
-        pane.velocity_z = read_float(f)
+        pane.initialVelOmni = read_float(f)
+        pane.initialVelAxis = read_float(f)
+        pane.initialVelRndm = read_float(f)
+        pane.initialVelDir = read_float(f)
 
-        pane.texScale_x = read_float(f)
-        pane.texScale_y = read_float(f)
-        pane.texScale_z = read_float(f)
+        pane.spread = read_float(f)
+        pane.initialVelRatio = read_float(f)
+        pane.rate = read_float(f)
+        pane.rateRndm = read_float(f)
+        pane.lifeTimeRndm = read_float(f)
+        pane.volumeSweep = read_float(f)
+        pane.volumeMinRad = read_float(f)
+        pane.airResist = read_float(f)
+        pane.momentRndm = read_float(f)
 
-        pane.move_x = read_float(f)
-        pane.move_y = read_float(f)
-        pane.move_z = read_float(f)
-        pane.forward_factor = read_float(f)
+        pane.emitterRotX = read_uint16(f)
+        pane.emitterRotY = read_uint16(f)
+        pane.emitterRotZ = read_uint16(f)
 
-        pane.angle_x = read_uint16(f)
-        pane.angle_y = read_uint16(f)
-        pane.angle_z = read_uint16(f)
+        pane.maxFrame = read_uint16(f)
+        pane.startFrame = read_uint16(f)
+        pane.lifeTime = read_uint16(f)
 
-        pane.stopTime = read_uint16(f)
-        pane.startTime = read_uint16(f)
-        pane.duration = read_uint16(f)
-
-        pane.unk5 = read_uint16(f)
-        pane.unk6 = read_uint16(f)
-        pane.interval = read_uint16(f)
+        pane.volumeSize = read_uint16(f)
+        pane.divNumber = read_uint16(f)
+        pane.rateStep = read_uint8(f)
         read_uint16(f)#padding
+        read_uint8(f)#padding
         
         assert f.tell() == start + size
         return pane
@@ -216,49 +252,43 @@ class DynamicsBlock(object):
         start = f.tell()
         write_name(f, self.name)
         write_uint32(f, 0x7c)
-        write_uint32(f, int(self.flags, base=16))
+        write_uint32(f, int(self.emitFlags, base=16))
 
-        write_uint32(f, self.unk1)
-        write_float(f, self.unk2)
-        write_float(f, self.unk3)
-        write_float(f, self.unk4)
+        write_uint32(f, 0)#padding
+        self.emitterScale.write(f)
 
-        write_float(f, self.pos_x)
-        write_float(f, self.pos_y)
-        write_float(f, self.pos_z)
+        self.emitterTranslation.write(f)
 
-        write_float(f, self.axis_x)
-        write_float(f, self.axis_y)
-        write_float(f, self.axis_z)
+        self.emitterDirection.write(f)
 
-        write_float(f, self.rand_angle_x)
-        write_float(f, self.rand_angle_y)
-        write_float(f, self.rand_angle_z)
+        write_float(f, self.initialVelOmni)
+        write_float(f, self.initialVelAxis)
+        write_float(f, self.initialVelRndm)
+        write_float(f, self.initialVelDir)
 
-        write_float(f, self.velocity_x)
-        write_float(f, self.velocity_y)
-        write_float(f, self.velocity_z)
+        write_float(f, self.spread)
+        write_float(f, self.initialVelRatio)
+        write_float(f, self.rate)
+        write_float(f, self.rateRndm)
+        write_float(f, self.lifeTimeRndm)
 
-        write_float(f, self.texScale_x)
-        write_float(f, self.texScale_y)
-        write_float(f, self.texScale_z)
+        write_float(f, self.volumeSweep)
+        write_float(f, self.volumeMinRad)
+        write_float(f, self.airResist)
+        write_float(f, self.momentRndm)
 
-        write_float(f, self.move_x)
-        write_float(f, self.move_y)
-        write_float(f, self.move_z)
-        write_float(f, self.forward_factor)
+        write_uint16(f, self.emitterRotX)
+        write_uint16(f, self.emitterRotY)
+        write_uint16(f, self.emitterRotZ)
 
-        write_uint16(f, self.angle_x)
-        write_uint16(f, self.angle_y)
-        write_uint16(f, self.angle_z)
-
-        write_uint16(f, self.stopTime)
-        write_uint16(f, self.startTime)
-        write_uint16(f, self.duration)
-        write_uint16(f, self.unk5)
-        write_uint16(f, self.unk6)
-        write_uint16(f, self.interval)
+        write_uint16(f, self.maxFrame)
+        write_uint16(f, self.startFrame)
+        write_uint16(f, self.lifeTime)
+        write_uint16(f, self.volumeSize)
+        write_uint16(f, self.divNumber)
+        write_uint8(f, self.rateStep)
         write_uint16(f, 0)
+        write_uint8(f,0)
 
         assert f.tell() == start + 0x7c
 
@@ -281,48 +311,56 @@ class DynamicsBlock(object):
     def deserialize(cls, obj):
         item = cls()
         item.name = "BEM1"
-        item.assign(obj, "flags")
+        item.assign(obj, "emitFlags")
 
-        item.assign(obj, "unk1")
-        item.assign(obj, "unk2")
-        item.assign(obj, "unk3")
-        item.assign(obj, "unk4")
+        item.assign(obj, "emitterScale")
+        vec = Vector3()
+        vec.x = item.emitterScale["x"]
+        vec.y = item.emitterScale["y"]
+        vec.z = item.emitterScale["z"]
+        item.emitterScale = vec
 
-        item.assign(obj, "pos_x")
-        item.assign(obj, "pos_y")
-        item.assign(obj, "pos_z")
+        item.assign(obj, "emitterTranslation")
+        vec = Vector3()
+        vec.x = item.emitterTranslation["x"]
+        vec.y = item.emitterTranslation["y"]
+        vec.z = item.emitterTranslation["z"]
+        item.emitterTranslation = vec
 
-        item.assign(obj, "axis_x")
-        item.assign(obj, "axis_y")
-        item.assign(obj, "axis_z")
+        item.assign(obj, "emitterDirection")
+        vec = Vector3()
+        vec.x = item.emitterDirection["x"]
+        vec.y = item.emitterDirection["y"]
+        vec.z = item.emitterDirection["z"]
+        item.emitterDirection = vec
 
-        item.assign(obj, "rand_angle_x")
-        item.assign(obj, "rand_angle_y")
-        item.assign(obj, "rand_angle_z")
+        item.assign(obj, "initialVelOmni")
+        item.assign(obj, "initialVelAxis")
+        item.assign(obj, "initialVelRndm")
+        item.assign(obj, "initialVelDir")
 
-        item.assign(obj, "velocity_x")
-        item.assign(obj, "velocity_y")
-        item.assign(obj, "velocity_z")
+        item.assign(obj, "spread")
+        item.assign(obj, "initialVelRatio")
+        item.assign(obj, "rate")
+        item.assign(obj, "rateRndm")
+        item.assign(obj, "lifeTimeRndm")
 
-        item.assign(obj, "texScale_x")
-        item.assign(obj, "texScale_y")
-        item.assign(obj, "texScale_z")
+        item.assign(obj, "volumeSweep")
+        item.assign(obj, "volumeMinRad")
+        item.assign(obj, "airResist")
+        item.assign(obj, "momentRndm")
 
-        item.assign(obj, "move_x")
-        item.assign(obj, "move_y")
-        item.assign(obj, "move_z")
-        item.assign(obj, "forward_factor")
+        item.assign(obj, "emitterRotX")
+        item.assign(obj, "emitterRotY")
+        item.assign(obj, "emitterRotZ")
 
-        item.assign(obj, "angle_x")
-        item.assign(obj, "angle_y")
-        item.assign(obj, "angle_z")
+        item.assign(obj, "maxFrame")
+        item.assign(obj, "startFrame")
+        item.assign(obj, "lifeTime")
+        item.assign(obj, "volumeSize")
+        item.assign(obj, "divNumber")
+        item.assign(obj, "rateStep")
 
-        item.assign(obj, "stopTime")
-        item.assign(obj, "startTime")
-        item.assign(obj, "duration")
-        item.assign(obj, "unk5")
-        item.assign(obj, "unk6")
-        item.assign(obj, "interval")
         return item 
 
 
@@ -344,7 +382,6 @@ class BaseShape_ColorData(object):
     def write(self, f):
         write_uint16(f, self.MatId)
         write_uint32(f, int(self.color, base=16))
-
 
     def serialize(self):
         result = {}
@@ -388,28 +425,28 @@ class BaseShape(object):
         colorTable1Offs = read_uint16(f)
         colorTable2Offs = read_uint16(f)
 
-        shape.Scale_x = read_float(f)
-        shape.Scale_y = read_float(f)
+        shape.baseSizeX = read_float(f)
+        shape.baseSizeY = read_float(f)
 
-        shape.GXBlend = read_uint16(f)
-        shape.GXAlpha1 = read_uint8(f)
-        shape.GXAlpha2 = read_uint8(f)
-        shape.GXAlpha3 = read_uint8(f)
-        shape.GXZcomp = read_uint8(f)
-        shape.flags2 = read_uint8(f)
-        shape.colorDiv = read_uint8(f)
-        shape.TexIndex = read_uint8(f)
+        shape.blendModeFlags = read_uint16(f)
+        shape.alphaCompareFlags = read_uint8(f)
+        shape.alphaRef0 = read_uint8(f)
+        shape.alphaRef1 = read_uint8(f)
+        shape.zModeFlags = read_uint8(f)
+        shape.texFlags = read_uint8(f)
+        shape.texIdxAnimCount = read_uint8(f)
+        shape.texIdx = read_uint8(f)
+        shape.colorFlags = read_uint8(f)
 
-        shape.ColorTableFlags = read_uint8(f)
         shape.ColorTable1Count = read_uint8(f)# colortable has 6 bytes for each of these
         shape.ColorTable2Count = read_uint8(f)
         shape.repeatDiv = read_uint16(f)
-        shape.Color1 = hex(read_uint32(f))
-        shape.Color2 = hex(read_uint32(f))
+        shape.ColorPrm = hex(read_uint32(f))
+        shape.ColorEnv = hex(read_uint32(f))
 
-        shape.init_p = read_uint8(f)
-        shape.repeatFlag = read_uint8(f)
-        shape.mergeFlag = read_uint8(f)
+        shape.anmRndm = read_uint8(f)
+        shape.colorLoopOfStMask = read_uint8(f)
+        shape.texIdxLoopOfstMask = read_uint8(f)
         read_uint16(f)
         read_uint8(f)
 
@@ -419,10 +456,10 @@ class BaseShape(object):
             for x in range(10):
                 shape.floatMatrix.append(read_float(f))
 
-        if shape.colorDiv != 0:#this is for some extra junk only used by mergeIdx functions
+        if shape.texIdxAnimCount != 0:#this is for some extra junk only used by mergeIdx functions
             shape.MergeIdx = read_uint32(f)
             test = read_uint32(f)
-            if shape.colorDiv > 4:#extended list
+            if shape.texIdxAnimCount > 4:#extended list
                 shape.MergeIdx2 = test
 
         if colorTable1Offs != 0:
@@ -449,26 +486,25 @@ class BaseShape(object):
         if offs % 4 != 0:
             offs +=2
         write_uint16(f, offs)#dynamically determine second color table offset
-        write_float(f, self.Scale_x)
-        write_float(f, self.Scale_y)
-        write_uint16(f, self.GXBlend)
-        write_uint8(f, self.GXAlpha1)
-        write_uint8(f, self.GXAlpha2)
-        write_uint8(f, self.GXAlpha3)
-        write_uint8(f, self.GXZcomp)
-        write_uint8(f, self.flags2)
-        write_uint8(f, self.colorDiv)
-        write_uint8(f, self.TexIndex)
-
-        write_uint8(f, self.ColorTableFlags)
+        write_float(f, self.baseSizeX)
+        write_float(f, self.baseSizeY)
+        write_uint16(f, self.blendModeFlags)
+        write_uint8(f, self.alphaCompareFlags)
+        write_uint8(f, self.alphaRef0)
+        write_uint8(f, self.alphaRef1)
+        write_uint8(f, self.zModeFlags)
+        write_uint8(f, self.texFlags)
+        write_uint8(f, self.texIdxAnimCount)
+        write_uint8(f, self.texIdx)
+        write_uint8(f, self.colorFlags)
         write_uint8(f, self.ColorTable1Count)
         write_uint8(f, self.ColorTable2Count)
         write_uint16(f, self.repeatDiv)
-        write_uint32(f, int(self.Color1, base=16))
-        write_uint32(f, int(self.Color2, base=16))
-        write_uint8(f, self.init_p)
-        write_uint8(f, self.repeatFlag)
-        write_uint8(f, self.mergeFlag)
+        write_uint32(f, int(self.ColorPrm, base=16))
+        write_uint32(f, int(self.ColorEnv, base=16))
+        write_uint8(f, self.anmRndm)
+        write_uint8(f, self.colorLoopOfStMask)
+        write_uint8(f, self.texIdxLoopOfstMask)
         write_uint16(f,0)
         write_uint8(f,0)
 
@@ -480,11 +516,11 @@ class BaseShape(object):
             offs2 += 0x28
 
 
-        if self.colorDiv != 0:#mergeIdx
+        if self.texIdxAnimCount != 0:#mergeIdx
             write_uint32(f,self.MergeIdx)
             offs2 += 4
 
-        if self.colorDiv > 4:#even more mergeIDx stuff
+        if self.texIdxAnimCount > 4:#even more mergeIDx stuff
             write_uint32(f,self.MergeIdx2)
             offs2 += 4
 
@@ -548,33 +584,33 @@ class BaseShape(object):
         item.name = "BSP1"
         item.assign(obj[0], "flags")
 
-        item.assign(obj[0], "Scale_x")
-        item.assign(obj[0], "Scale_y")
+        item.assign(obj[0], "baseSizeX")
+        item.assign(obj[0], "baseSizeY")
 
-        item.assign(obj[0], "GXBlend")
-        item.assign(obj[0], "GXAlpha1")
-        item.assign(obj[0], "GXAlpha2")
-        item.assign(obj[0], "GXAlpha3")
-        item.assign(obj[0], "GXZcomp")
-        item.assign(obj[0], "flags2")
-        item.assign(obj[0], "colorDiv")
-        item.assign(obj[0], "TexIndex")
+        item.assign(obj[0], "blendModeFlags")
+        item.assign(obj[0], "alphaCompareFlags")
+        item.assign(obj[0], "alphaRef0")
+        item.assign(obj[0], "alphaRef1")
+        item.assign(obj[0], "zModeFlags")
+        item.assign(obj[0], "texFlags")
+        item.assign(obj[0], "texIdxAnimCount")
+        item.assign(obj[0], "texIdx")
+        item.assign(obj[0], "colorFlags")
 
-        item.assign(obj[0], "ColorTableFlags")
         item.assign(obj[0], "ColorTable1Count")
         item.assign(obj[0], "ColorTable2Count")
         item.assign(obj[0], "repeatDiv")
-        item.assign(obj[0], "Color1")
-        item.assign(obj[0], "Color2")
+        item.assign(obj[0], "ColorPrm")
+        item.assign(obj[0], "ColorEnv")
 
         if "MergeIdx" in obj[0]:
             item.assign(obj[0], "MergeIdx")
         if "MergeIdx2" in obj[0]:
             item.assign(obj[0], "MergeIdx2")
 
-        item.assign(obj[0], "init_p")
-        item.assign(obj[0], "repeatFlag")
-        item.assign(obj[0], "mergeFlag")
+        item.assign(obj[0], "anmRndm")
+        item.assign(obj[0], "colorLoopOfStMask")
+        item.assign(obj[0], "texIdxLoopOfstMask")
 
         if "floatMatrix" in obj[0]:
             item.assign(obj[0], "floatMatrix")
@@ -605,23 +641,17 @@ class FieldBlock(object):
         field.name = name
         field.flags = hex(read_uint32(f))
 
-        field.offset_x = read_float(f)
-        field.offset_y = read_float(f)
-        field.offset_z = read_float(f)
+        field.position = Vector3.from_file(f)
+        field.direction = Vector3.from_file(f)
 
-        field.move_x = read_float(f)
-        field.move_y = read_float(f)
-        field.move_z = read_float(f)
-
-        field.amplitude = read_float(f)
-
-        field.vortex_speed = read_float(f)
-        field.newton_speed = read_float(f)
-        field.timerMax1 = read_float(f)
-        field.timerMax2 = read_float(f)
-        field.timerOffset1 = read_float(f)
-        field.timerOffset2 = read_float(f)
-        field.randDiv = read_uint8(f)
+        field.param1 = read_float(f)
+        field.param2 = read_float(f)
+        field.param3 = read_float(f)
+        field.fadeIn = read_float(f)
+        field.fadeOut = read_float(f)
+        field.enTime = read_float(f)
+        field.disTime = read_float(f)
+        field.cycle = read_uint8(f)
         read_uint16(f)
         read_uint8(f)
 
@@ -633,22 +663,18 @@ class FieldBlock(object):
         write_name(f, self.name)
         write_uint32(f, 0x44)#size
         write_uint32(f, int(self.flags, base=16))
-        write_float(f, self.offset_x)
-        write_float(f, self.offset_y)
-        write_float(f, self.offset_z)
-        write_float(f, self.move_x)
-        write_float(f, self.move_y)
-        write_float(f, self.move_z)
-        write_float(f, self.amplitude)
-        write_float(f, self.vortex_speed)
-        write_float(f, self.newton_speed)
-        write_float(f, self.timerMax1)
-        write_float(f, self.timerMax2)
-        write_float(f, self.timerOffset1)
-        write_float(f, self.timerOffset2)
-        write_uint8(f, self.randDiv)
-        write_uint8(f, 0)
-        write_uint8(f, 0)
+        self.position.write(f)
+        self.direction.write(f)
+
+        write_float(f, self.param1)
+        write_float(f, self.param2)
+        write_float(f, self.param3)
+        write_float(f, self.fadeIn)
+        write_float(f, self.fadeOut)
+        write_float(f, self.enTime)
+        write_float(f, self.disTime)
+        write_uint8(f, self.cycle)
+        write_uint16(f, 0)
         write_uint8(f, 0)
 
         assert f.tell() == start + 0x44
@@ -673,25 +699,30 @@ class FieldBlock(object):
         item.name = "FLD1"
         item.assign(obj, "flags")
 
-        item.assign(obj, "offset_x")
-        item.assign(obj, "offset_y")
-        item.assign(obj, "offset_z")
+        item.assign(obj, "position")
+        vec = Vector3()
+        vec.x = item.position["x"]
+        vec.y = item.position["y"]
+        vec.z = item.position["z"]
+        item.position = vec
 
-        item.assign(obj, "move_x")
-        item.assign(obj, "move_y")
-        item.assign(obj, "move_z")
+        item.assign(obj, "direction")
+        vec = Vector3()
+        vec.x = item.direction["x"]
+        vec.y = item.direction["y"]
+        vec.z = item.direction["z"]
+        item.direction = vec
 
-        item.assign(obj, "amplitude")
+        item.assign(obj, "param1")
+        item.assign(obj, "param2")
+        item.assign(obj, "param3")
 
-        item.assign(obj, "vortex_speed")
-        item.assign(obj, "newton_speed")
+        item.assign(obj, "fadeIn")
+        item.assign(obj, "fadeOut")
 
-        item.assign(obj, "timerMax1")
-        item.assign(obj, "timerMax2")
-
-        item.assign(obj, "timerOffset1")
-        item.assign(obj, "timerOffset2")
-        item.assign(obj, "randDiv")
+        item.assign(obj, "enTime")
+        item.assign(obj, "disTime")
+        item.assign(obj, "cycle")
 
         return item
 
@@ -714,34 +745,32 @@ class ExtraShape(object):
         field.name = name
         field.flags = hex(read_uint32(f))
 
-        field.growrate = read_float(f)
-        field.decay = read_float(f)
-        field.startscale = read_float(f)
+        field.scaleInTiming = read_float(f)
+        field.scaleOutTiming = read_float(f)
+        field.scaleInValueX = read_float(f)
+        field.scaleOutValueX = read_float(f)
+        field.scaleInValueY = read_float(f)
+        field.scaleOutValueY = read_float(f)
+        field.scaleOutRandom = read_float(f)
 
-        field.unk_x = read_float(f)
-        field.unk_y = read_float(f)
-        field.unk_z = read_float(f)
+        field.scaleAnmMaxFrameX = read_uint16(f)
+        field.scaleAnmMaxFrameY = read_uint16(f)
 
-        field.randscale = read_float(f)
+        field.alphaInTiming = read_float(f)
+        field.alphaOutTiming = read_float(f)
+        field.alphaInValue = read_float(f)
+        field.alphaBaseValue = read_float(f)
+        field.alphaOutValue = read_float(f)
 
-        field.repeatX = read_uint16(f)
-        field.repeatY = read_uint16(f)
+        field.alphaWaveFrequency = read_float(f)
+        field.alphaWaveRandom = read_float(f)
+        field.alphaWaveAmplitude = read_float(f)
 
-        field.fadeout = read_float(f)
-        field.fadein = read_float(f)
-        field.alphamod = read_float(f)
-        field.fadestart = read_float(f)
-        field.fadeend = read_float(f)
-
-        field.alphaFlick1 = read_float(f)
-        field.radius = read_float(f)
-        field.alphaFlick2 = read_float(f)
-
-        field.A1_factor1 = read_float(f)
-        field.A1_factor2 = read_float(f)
-        field.A2_factor1 = read_float(f)
-        field.A2_factor2 = read_float(f)
-        field.Aflip_threshold = read_float(f)
+        field.rotateAngle = read_float(f)
+        field.rotateAngleRandom = read_float(f)
+        field.rotateSpeed = read_float(f)
+        field.rotateSpeedRandom = read_float(f)
+        field.rotateDirection = read_float(f)
 
         assert f.tell() == start + size
         return field 
@@ -751,28 +780,28 @@ class ExtraShape(object):
         write_name(f, self.name)
         write_uint32(f, 0x60)
         write_uint32(f, int(self.flags, base=16))
-        write_float(f, self.growrate)
-        write_float(f, self.decay)
-        write_float(f, self.startscale)
-        write_float(f, self.unk_x)
-        write_float(f, self.unk_y)
-        write_float(f, self.unk_z)
-        write_float(f, self.randscale)
-        write_uint16(f, self.repeatX)
-        write_uint16(f, self.repeatY)
-        write_float(f, self.fadeout)
-        write_float(f, self.fadein)
-        write_float(f, self.alphamod)
-        write_float(f, self.fadestart)
-        write_float(f, self.fadeend)
-        write_float(f, self.alphaFlick1)
-        write_float(f, self.radius)
-        write_float(f, self.alphaFlick2)
-        write_float(f, self.A1_factor1)
-        write_float(f, self.A1_factor2)
-        write_float(f, self.A2_factor1)
-        write_float(f, self.A2_factor2)
-        write_float(f, self.Aflip_threshold)
+        write_float(f, self.scaleInTiming)
+        write_float(f, self.scaleOutTiming)
+        write_float(f, self.scaleInValueX)
+        write_float(f, self.scaleOutValueX)
+        write_float(f, self.scaleInValueY)
+        write_float(f, self.scaleOutValueY)
+        write_float(f, self.scaleOutRandom)
+        write_uint16(f, self.scaleAnmMaxFrameX)
+        write_uint16(f, self.scaleAnmMaxFrameY)
+        write_float(f, self.alphaInTiming)
+        write_float(f, self.alphaOutTiming)
+        write_float(f, self.alphaInValue)
+        write_float(f, self.alphaBaseValue)
+        write_float(f, self.alphaOutValue)
+        write_float(f, self.alphaWaveFrequency)
+        write_float(f, self.alphaWaveRandom)
+        write_float(f, self.alphaWaveAmplitude)
+        write_float(f, self.rotateAngle)
+        write_float(f, self.rotateAngleRandom)
+        write_float(f, self.rotateSpeed)
+        write_float(f, self.rotateSpeedRandom)
+        write_float(f, self.rotateDirection)
 
         assert f.tell() == start + 0x60
 
@@ -799,33 +828,34 @@ class ExtraShape(object):
         item.name = "ESP1"
         item.assign(obj, "flags")
 
-        item.assign(obj, "growrate")
-        item.assign(obj, "decay")
-        item.assign(obj, "startscale")
+        item.assign(obj, "scaleInTiming")
+        item.assign(obj, "scaleOutTiming")
 
-        item.assign(obj, "unk_x")
-        item.assign(obj, "unk_y")
-        item.assign(obj, "unk_z")
+        item.assign(obj, "scaleInValueX")
+        item.assign(obj, "scaleOutValueX")
 
-        item.assign(obj, "randscale")
-        item.assign(obj, "repeatX")
-        item.assign(obj, "repeatY")
+        item.assign(obj, "scaleInValueY")
+        item.assign(obj, "scaleOutValueY")
 
-        item.assign(obj, "fadeout")
-        item.assign(obj, "fadein")
-        item.assign(obj, "alphamod")
-        item.assign(obj, "fadestart")
-        item.assign(obj, "fadeend")
+        item.assign(obj, "scaleOutRandom")
+        item.assign(obj, "scaleAnmMaxFrameX")
+        item.assign(obj, "scaleAnmMaxFrameY")
 
-        item.assign(obj, "alphaFlick1")
-        item.assign(obj, "radius")
-        item.assign(obj, "alphaFlick2")
+        item.assign(obj, "alphaInTiming")
+        item.assign(obj, "alphaOutTiming")
+        item.assign(obj, "alphaInValue")
+        item.assign(obj, "alphaBaseValue")
+        item.assign(obj, "alphaOutValue")
 
-        item.assign(obj, "A1_factor1")
-        item.assign(obj, "A1_factor2")
-        item.assign(obj, "A2_factor1")
-        item.assign(obj, "A2_factor2")
-        item.assign(obj, "Aflip_threshold")
+        item.assign(obj, "alphaWaveFrequency")
+        item.assign(obj, "alphaWaveRandom")
+        item.assign(obj, "alphaWaveAmplitude")
+
+        item.assign(obj, "rotateAngle")
+        item.assign(obj, "rotateAngleRandom")
+        item.assign(obj, "rotateSpeed")
+        item.assign(obj, "rotateSpeedRandom")
+        item.assign(obj, "rotateDirection")
 
         return item
 
@@ -909,17 +939,17 @@ class ExTexShape(object):
         field.name = name
         field.flags = hex(read_uint32(f))
 
-        field.texMtx1 = read_float(f)
-        field.texMtx2 = read_float(f)
-        field.texMtx3 = read_float(f)
-        field.texMtx4 = read_float(f)
-        field.texMtx5 = read_float(f)
-        field.texMtx6 = read_float(f)
+        field.texMtx00 = read_float(f)
+        field.texMtx01 = read_float(f)
+        field.texMtx02 = read_float(f)
+        field.texMtx10 = read_float(f)
+        field.texMtx11 = read_float(f)
+        field.texMtx12 = read_float(f)
 
         #field.flags2 = hex(read_uint32(f))
-        field.texMtxID = read_uint8(f)
-        field.EXTexID1 = read_uint8(f)
-        field.EXTexID2 = read_uint8(f)
+        field.scale = read_uint8(f)
+        field.indTextureID = read_uint8(f)
+        field.secondTextureIndex = read_uint8(f)
         read_uint8(f)
 
         assert f.tell() == start + size
@@ -931,16 +961,16 @@ class ExTexShape(object):
         write_uint32(f, 0x28)
         write_uint32(f, int(self.flags, base=16))
 
-        write_float(f, self.texMtx1)
-        write_float(f, self.texMtx2)
-        write_float(f, self.texMtx3)
-        write_float(f, self.texMtx4)
-        write_float(f, self.texMtx5)
-        write_float(f, self.texMtx6)
+        write_float(f, self.texMtx00)
+        write_float(f, self.texMtx01)
+        write_float(f, self.texMtx02)
+        write_float(f, self.texMtx10)
+        write_float(f, self.texMtx11)
+        write_float(f, self.texMtx12)
 
-        write_uint8(f, self.texMtxID)
-        write_uint8(f, self.EXTexID1)
-        write_uint8(f, self.EXTexID2)
+        write_uint8(f, self.scale)
+        write_uint8(f, self.indTextureID)
+        write_uint8(f, self.secondTextureIndex)
         write_uint8(f, 0)
 
         assert f.tell() == start + 0x28
@@ -966,16 +996,16 @@ class ExTexShape(object):
         item = cls()
         item.name = "ETX1"
         item.assign(obj, "flags")
-        item.assign(obj, "texMtx1")
-        item.assign(obj, "texMtx2")
-        item.assign(obj, "texMtx3")
-        item.assign(obj, "texMtx4")
-        item.assign(obj, "texMtx5")
-        item.assign(obj, "texMtx6")
+        item.assign(obj, "texMtx00")
+        item.assign(obj, "texMtx01")
+        item.assign(obj, "texMtx02")
+        item.assign(obj, "texMtx10")
+        item.assign(obj, "texMtx11")
+        item.assign(obj, "texMtx12")
 
-        item.assign(obj, "texMtxID")
-        item.assign(obj, "EXTexID1")
-        item.assign(obj, "EXTexID2")
+        item.assign(obj, "scale")
+        item.assign(obj, "indTextureID")
+        item.assign(obj, "secondTextureIndex")
 
         return item
 
@@ -998,25 +1028,25 @@ class ChildShape(object):
         field.name = name
         field.flags = hex(read_uint32(f))
 
-        field.radiusFactor1 = read_float(f)
-        field.radiusFactor2 = read_float(f)
-        field.radiusFactor3 = read_float(f)
-        field.scaleModifier = read_float(f)
-        field.Y_offset = read_float(f)
-        field.X_scale = read_float(f)
-        field.Y_scale = read_float(f)
-        field.childScale = read_float(f)
-        field.AlphaModifier = read_float(f)
-        field.ColorModifier = read_float(f)
+        field.posRndm = read_float(f)
+        field.baseVel = read_float(f)
+        field.baseVelRndm = read_float(f)
+        field.velInfRate = read_float(f)
+        field.gravity = read_float(f)
+        field.globalScale2DX = read_float(f)
+        field.globalScale2DY = read_float(f)
+        field.inheritScale = read_float(f)
+        field.inheritAlpha = read_float(f)
+        field.inheritRGB = read_float(f)
 
-        field.TEVColor1 = hex(read_uint32(f))
-        field.TEVColor2 = hex(read_uint32(f))
-        field.ChildCountModifier = read_float(f)
-        field.calc_count = read_uint16(f)
-        field.ChildEmitterCount = read_uint16(f)
-        field.maxChildren = read_uint8(f)
-        field.TexIndex_offset = read_uint8(f)
-        field.unk_Alpha = read_uint16(f)
+        field.ColorPrm = hex(read_uint32(f))
+        field.ColorEnv = hex(read_uint32(f))
+        field.timing = read_float(f)
+        field.life = read_uint16(f)
+        field.rate = read_uint16(f)
+        field.step = read_uint8(f)
+        field.texIdx = read_uint8(f)
+        field.rotateSpeed = read_uint16(f)
 
         assert f.tell() == start + size
         return field 
@@ -1027,25 +1057,25 @@ class ChildShape(object):
         write_uint32(f, 0x48)
         write_uint32(f, int(self.flags, base=16))
 
-        write_float(f, self.radiusFactor1)
-        write_float(f, self.radiusFactor2)
-        write_float(f, self.radiusFactor3)
-        write_float(f, self.scaleModifier)
-        write_float(f, self.Y_offset)
-        write_float(f, self.X_scale)
-        write_float(f, self.Y_scale)
-        write_float(f, self.childScale)
-        write_float(f, self.AlphaModifier)
-        write_float(f, self.ColorModifier)
+        write_float(f, self.posRndm)
+        write_float(f, self.baseVel)
+        write_float(f, self.baseVelRndm)
+        write_float(f, self.velInfRate)
+        write_float(f, self.gravity)
+        write_float(f, self.globalScale2DX)
+        write_float(f, self.globalScale2DY)
+        write_float(f, self.inheritScale)
+        write_float(f, self.inheritAlpha)
+        write_float(f, self.inheritRGB)
 
-        write_uint32(f, int(self.TEVColor1, base=16))
-        write_uint32(f, int(self.TEVColor2, base=16))
-        write_float(f, self.ChildCountModifier)
-        write_uint16(f, self.calc_count)
-        write_uint16(f, self.ChildEmitterCount)
-        write_uint8(f, self.maxChildren)
-        write_uint8(f, self.TexIndex_offset)
-        write_uint16(f, self.unk_Alpha)
+        write_uint32(f, int(self.ColorPrm, base=16))
+        write_uint32(f, int(self.ColorEnv, base=16))
+        write_float(f, self.timing)
+        write_uint16(f, self.life)
+        write_uint16(f, self.rate)
+        write_uint8(f, self.step)
+        write_uint8(f, self.texIdx)
+        write_uint16(f, self.rotateSpeed)
 
         assert f.tell() == start + 0x48
 
@@ -1070,51 +1100,51 @@ class ChildShape(object):
         item = cls()
         item.name = "SSP1"
         item.assign(obj, "flags")
-        item.assign(obj, "radiusFactor1")
-        item.assign(obj, "radiusFactor2")
-        item.assign(obj, "radiusFactor3")
+        item.assign(obj, "posRndm")
+        item.assign(obj, "baseVel")
+        item.assign(obj, "baseVelRndm")
 
-        item.assign(obj, "scaleModifier")
-        item.assign(obj, "Y_offset")
-        item.assign(obj, "X_scale")
-        item.assign(obj, "Y_scale")
-        item.assign(obj, "childScale")
-        item.assign(obj, "AlphaModifier")
-        item.assign(obj, "ColorModifier")
+        item.assign(obj, "velInfRate")
+        item.assign(obj, "gravity")
+        item.assign(obj, "globalScale2DX")
+        item.assign(obj, "globalScale2DY")
+        item.assign(obj, "inheritScale")
+        item.assign(obj, "inheritAlpha")
+        item.assign(obj, "inheritRGB")
 
-        item.assign(obj, "TEVColor1")
-        item.assign(obj, "TEVColor2")
-        item.assign(obj, "ChildCountModifier")
-        item.assign(obj, "calc_count")
-        item.assign(obj, "ChildEmitterCount")
-        item.assign(obj, "maxChildren")
-        item.assign(obj, "TexIndex_offset")
-        item.assign(obj, "unk_Alpha")
+        item.assign(obj, "ColorPrm")
+        item.assign(obj, "ColorEnv")
+        item.assign(obj, "timing")
+        item.assign(obj, "life")
+        item.assign(obj, "rate")
+        item.assign(obj, "step")
+        item.assign(obj, "texIdx")
+        item.assign(obj, "rotateSpeed")
 
         return item
 
 #Key Frame sub-objects within the KFA1 block
 class KeyBlock_field(object):
     def __init__(self):
-        self.Frame = 0.0
-        self.calc = 0.0
-        self.tangent1 = 0.0
-        self.tangent2 = 0.0
+        self.time = 0.0
+        self.value = 0.0
+        self.tangent_in = 0.0
+        self.tangent_out = 0.0
 
     @classmethod
     def from_file(cls, f):
         shape = cls()
-        shape.Frame = read_float(f)
-        shape.calc = read_float(f)
-        shape.tangent1 = read_float(f)
-        shape.tangent2 = read_float(f)
+        shape.time = read_float(f)
+        shape.value = read_float(f)
+        shape.tangent_in = read_float(f)
+        shape.tangent_out = read_float(f)
         return shape
 
     def write(self, f):
-        write_float(f, self.Frame)
-        write_float(f, self.calc)
-        write_float(f, self.tangent1)
-        write_float(f, self.tangent2)
+        write_float(f, self.time)
+        write_float(f, self.value)
+        write_float(f, self.tangent_in)
+        write_float(f, self.tangent_out)
 
     def serialize(self):
         result = {}
@@ -1130,10 +1160,10 @@ class KeyBlock_field(object):
     @classmethod
     def deserialize(cls, obj):
         item = cls()
-        item.assign(obj, "Frame")
-        item.assign(obj, "calc")
-        item.assign(obj, "tangent1")
-        item.assign(obj, "tangent2")
+        item.assign(obj, "time")
+        item.assign(obj, "value")
+        item.assign(obj, "tangent_in")
+        item.assign(obj, "tangent_out")
         return item
 
 #the KFA1 does animation key frame calculation stuff
@@ -1158,7 +1188,7 @@ class KeyBlock(object):
 
         shape.flag = read_uint8(f)
         shape.KeyFrameCount = read_uint8(f)
-        shape.unk1 = read_uint8(f)
+        shape.isLoopEnable = read_uint8(f)
         shape.unk2 = read_uint8(f)
 
         for x in range(shape.KeyFrameCount):
@@ -1173,7 +1203,7 @@ class KeyBlock(object):
         write_uint32(f, 0)#temp
         write_uint8(f, self.flag)
         write_uint8(f, self.KeyFrameCount)
-        write_uint8(f, self.unk1)
+        write_uint8(f, self.isLoopEnable)
         write_uint8(f, self.unk2)
 
         for field in self.calcList:
@@ -1212,7 +1242,7 @@ class KeyBlock(object):
         item.name = "KFA1"
         item.assign(obj[0], "flag")
         item.assign(obj[0], "KeyFrameCount")
-        item.assign(obj[0], "unk1")
+        item.assign(obj[0], "isLoopEnable")
         item.assign(obj[0], "unk2")
 
         for x in range(item.KeyFrameCount):
@@ -1426,7 +1456,7 @@ if __name__ == "__main__":
             jpc = JPAContainer.from_file(f)
 
         with open(outfile, "w", encoding="utf-8") as f:
-            json.dump(jpc.serialize(), f, indent=4, ensure_ascii=False)
+            json.dump(jpc.serialize(), f, indent=4, ensure_ascii=False, default=vars)
 
     elif inputfile.endswith(".json"):
         if outfile == None:
