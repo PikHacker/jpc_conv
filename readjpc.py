@@ -209,7 +209,7 @@ class DynamicsBlock(object):
         assert size == 0x7c
         pane.emitFlags = hex(read_uint32(f))
 
-        read_uint32(f)# always 0
+        pane.unk = read_uint32(f)
         pane.emitterScale = Vector3.from_file(f)
 
         pane.emitterTranslation = Vector3.from_file(f)
@@ -254,7 +254,7 @@ class DynamicsBlock(object):
         write_uint32(f, 0x7c)
         write_uint32(f, int(self.emitFlags, base=16))
 
-        write_uint32(f, 0)#padding
+        write_uint32(f, self.unk)
         self.emitterScale.write(f)
 
         self.emitterTranslation.write(f)
@@ -313,6 +313,7 @@ class DynamicsBlock(object):
         item.name = "BEM1"
         item.assign(obj, "emitFlags")
 
+        item.assign(obj, "unk")
         item.assign(obj, "emitterScale")
         vec = Vector3()
         vec.x = item.emitterScale["x"]
